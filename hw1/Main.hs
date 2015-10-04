@@ -1,9 +1,9 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Main (SumList(..), CachedSumList, cList, cSum, cachedSumList, task1, mergeSort, insert, find, delete, fromList, TreeMap) where
+module Main (SumList(..), CachedSumList, cList, cSum, cachedSumList, task1, mergeSort) where
 import Data.Monoid
 import Data.List (splitAt)
 
-task1 = (foldl (+) 0) . map read . words
+task1 = sum . map read . words
 
 newtype SumList a = SumList [a]
   deriving (Show, Monoid)
@@ -52,51 +52,21 @@ mergeSort xs = let (l, r) = splitToHalves xs
         merge' [] bs = bs
         merge' (a:as) (b:bs) = if a <= b then a : (merge' as (b:bs)) else b : (merge' (a:as) bs)
 
-data TreeMap k v = Empty | Node k v (TreeMap k v) (TreeMap k v)
 
-insert   :: (Ord k) => k -> v -> (TreeMap k v) -> (TreeMap k v)
-find     :: (Ord k) => k -> (TreeMap k v) -> Maybe v
-fromList :: (Ord k) => [(k, v)] -> (TreeMap k v)
-delete   :: (Ord k) => k -> (TreeMap k v) -> TreeMap k v
+type Range = (Int, Int)
 
-insert k v Empty = Node k v Empty Empty
-insert k v (Node k' v' l r) | k == k' = Node k v l r
-                            | k < k' = Node k' v' (ins l) r
-                            | k > k' = Node k' v' l (ins r)
-      where ins = insert k v
+data Diagnostic t = D Range String
 
-find _ Empty = Nothing
-find k (Node k' v' l r) | k == k' = Just v'
-                        | k < k' = find k l
-                        | k > k' = find k r
+data Warning
+data Error
+warningT = undefined :: Warning
+errorT   = undefined :: Error
+overlaps :: Diagnostic t -> Diagnostic t -> Bool
+overlaps (D (a, b) _) (D (c, d) _) = let l = max a c
+                                         r = min b d
+                                      in l <= r
+createDiagnostic :: t -> Range -> String -> Diagnostic t
+createDiagnostic _ r s = D r s
 
-fromList = foldl (flip $ uncurry insert) Empty
-
-delete _ Empty = Empty
-delete k (Node k' v' l r) | k == k' = merge l r
-                          | k < k' = delete k l
-                          | k > k' = delete k r
-
-merge :: (Ord k) => (TreeMap k v) -> (TreeMap k v) -> TreeMap k v
-merge Empty n = n
-merge n Empty = n
-merge (Node k v l Empty) r = Node k v l r
-merge l r = Node k v l' r
-  where (l', Node k v Empty Empty) = pickupR l
-        pickupR (Node pk pv pl n@(Node nk nv nl Empty)) = (Node pk pv pl nl, Node nk nv Empty Empty)
-        pickupR p@(Node pk pv pl n@(Node _ _ _ nr)) = let (n', res) = pickupR n
-                                                       in (Node pk pv pl n', res)
-
-
-
--- красивый вывод дерева
-instance (Show k, Show v) => Show (TreeMap k v) where
-  show = foldl1 (\xs x -> (xs ++ "\n" ++ x)) . treeIndent
-    where treeIndent Empty           = ["-- /-"]
-          treeIndent (Node k v lb rb) =
-            ["-- (" ++ (show k) ++ ", " ++ (show v) ++ ")"] ++
-            map ("  |" ++) ls ++
-            ("  `" ++ r) : map ("   " ++) rs
-            where
-              (r:rs) = treeIndent rb
-              ls     = treeIndent lb
+d1 = createDiagnostic warningT (1, 2) "This is warning"
+d2 = D (3, 4) "This is error" :: Diagnostic Error
